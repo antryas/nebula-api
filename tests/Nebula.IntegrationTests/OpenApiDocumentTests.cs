@@ -67,6 +67,19 @@ public sealed class OpenApiDocumentTests(NebulaApiFactory factory)
         });
     }
 
+    [Theory]
+    [InlineData("/api/orders", new[] { "page", "pageSize", "sort", "dir", "search", "status", "from", "to" })]
+    [InlineData("/api/products", new[] { "page", "pageSize", "sort", "dir", "search", "category", "stock" })]
+    [InlineData("/api/customers", new[] { "page", "pageSize", "sort", "dir", "search" })]
+    public async Task List_query_parameters_are_camel_case(string path, string[] expected)
+    {
+        var parameters = (await GetDocumentAsync()).GetProperty("paths").GetProperty(path).GetProperty("get").GetProperty("parameters");
+
+        var names = parameters.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToArray();
+
+        Assert.Equal(expected, names);
+    }
+
     [Fact]
     public async Task Tags_are_ordered_and_described()
     {

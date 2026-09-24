@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Nebula.Api.OpenApi;
 using Nebula.Application.Common;
 using Nebula.Application.Orders;
@@ -8,7 +9,14 @@ public static class OrdersEndpoints
 {
     /// <summary>Raw <c>GET /api/orders</c> query; parsed leniently like the mock.</summary>
     public sealed record OrderListParameters(
-        string? Page, string? PageSize, string? Sort, string? Dir, string? Search, string? Status, string? From, string? To)
+        [FromQuery(Name = "page")] string? Page,
+        [FromQuery(Name = "pageSize")] string? PageSize,
+        [FromQuery(Name = "sort")] string? Sort,
+        [FromQuery(Name = "dir")] string? Dir,
+        [FromQuery(Name = "search")] string? Search,
+        [FromQuery(Name = "status")] string? Status,
+        [FromQuery(Name = "from")] string? From,
+        [FromQuery(Name = "to")] string? To)
     {
         public OrderListQuery ToQuery() =>
             OrderListQuery.Parse(ListQuery.Parse(Page, PageSize, Sort, Dir, Search), Status, From, To);

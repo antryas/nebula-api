@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Nebula.Application.Common;
 using Nebula.Application.Customers;
 
@@ -6,7 +7,12 @@ namespace Nebula.Api.Endpoints;
 public static class CustomersEndpoints
 {
     /// <summary>Raw <c>GET /api/customers</c> query; parsed leniently like the mock.</summary>
-    public sealed record CustomerListParameters(string? Page, string? PageSize, string? Sort, string? Dir, string? Search)
+    public sealed record CustomerListParameters(
+        [FromQuery(Name = "page")] string? Page,
+        [FromQuery(Name = "pageSize")] string? PageSize,
+        [FromQuery(Name = "sort")] string? Sort,
+        [FromQuery(Name = "dir")] string? Dir,
+        [FromQuery(Name = "search")] string? Search)
     {
         public ListQuery ToQuery() => ListQuery.Parse(Page, PageSize, Sort, Dir, Search);
     }

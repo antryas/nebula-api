@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Nebula.Api.OpenApi;
 using Nebula.Application.Common;
 using Nebula.Application.Products;
@@ -8,7 +9,13 @@ public static class ProductsEndpoints
 {
     /// <summary>Raw <c>GET /api/products</c> query; parsed leniently like the mock.</summary>
     public sealed record ProductListParameters(
-        string? Page, string? PageSize, string? Sort, string? Dir, string? Search, string? Category, string? Stock)
+        [FromQuery(Name = "page")] string? Page,
+        [FromQuery(Name = "pageSize")] string? PageSize,
+        [FromQuery(Name = "sort")] string? Sort,
+        [FromQuery(Name = "dir")] string? Dir,
+        [FromQuery(Name = "search")] string? Search,
+        [FromQuery(Name = "category")] string? Category,
+        [FromQuery(Name = "stock")] string? Stock)
     {
         public ProductListQuery ToQuery() =>
             ProductListQuery.Parse(ListQuery.Parse(Page, PageSize, Sort, Dir, Search), Category, Stock);

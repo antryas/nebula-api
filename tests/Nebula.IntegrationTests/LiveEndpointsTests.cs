@@ -39,4 +39,30 @@ public sealed class LiveEndpointsTests(NebulaApiFactory factory) : IClassFixture
         Assert.Equal(id, page.GetProperty("items")[0].GetProperty("id").GetString());
         Assert.Equal(order.GetProperty("number").GetInt32(), page.GetProperty("items")[0].GetProperty("number").GetInt32());
     }
+
+    [Fact]
+    public async Task Ticks_racing_a_demo_reset_all_succeed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var ticks = Enumerable.Range(0, 12).Select(_ => _client.PostAsync("/api/live/tick", null, ct)).ToList();
+        var reset = _client.PostAsync("/api/demo/reset", null, ct);
+        var responses = await Task.WhenAll(ticks.Append(reset));
+
+        try
+        {
+            Assert.All(responses.Take(ticks.Count), r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+            Assert.Equal(HttpStatusCode.NoContent, responses[^1].StatusCode);
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+
+            // Leave the seed intact for the other test in this class.
+            using var cleanup = await _client.PostAsync("/api/demo/reset", null, ct);
+        }
+    }
 }

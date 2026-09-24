@@ -17,9 +17,6 @@ public sealed class ProductsService(IAppDbContext db, IClock clock)
 
     private const string IdPrefix = "prd_";
 
-    /// <summary>Creates are serialized so two concurrent requests cannot pick the same next id.</summary>
-    private static readonly SemaphoreSlim CreateLock = new(1, 1);
-
     /// <summary>Every scalar <c>Product</c> property the mock can sort by.</summary>
     public static readonly IReadOnlyDictionary<string, Expression<Func<Product, object?>>> Sortable =
         new Dictionary<string, Expression<Func<Product, object?>>>(StringComparer.Ordinal)
@@ -80,8 +77,8 @@ public sealed class ProductsService(IAppDbContext db, IClock clock)
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        await CreateLock.WaitAsync(ct);
-        try
+        // Serialized so two concurrent requests cannot pick the same next id.
+        return await WriteGate.RunAsync(async () =>
         {
             await EnsureSkuIsFreeAsync(input.Sku, selfId: null, ct);
 
@@ -99,11 +96,7 @@ public sealed class ProductsService(IAppDbContext db, IClock clock)
             db.Products.Add(product);
             await db.SaveChangesAsync(ct);
             return product.ToDto();
-        }
-        finally
-        {
-            CreateLock.Release();
-        }
+        }, ct);
     }
 
     public async Task<ProductDto> UpdateAsync(string id, ProductInput input, CancellationToken ct)

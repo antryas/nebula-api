@@ -17,21 +17,10 @@ public sealed class LiveOrderFactory(IAppDbContext db, IClock clock, Random rand
     private static readonly PaymentMethod[] PaymentMethods =
         [PaymentMethod.Card, PaymentMethod.Card, PaymentMethod.PayPal, PaymentMethod.ApplePay];
 
-    // Serializes number allocation process-wide; order numbers are unique.
-    private static readonly SemaphoreSlim Gate = new(1, 1);
-
-    public async Task<OrderDto> CreateAsync(CancellationToken ct)
-    {
-        await Gate.WaitAsync(ct);
-        try
-        {
-            return (await CreateOrderAsync(ct)).ToDto();
-        }
-        finally
-        {
-            Gate.Release();
-        }
-    }
+    // Serialized with other allocating writes and demo resets: order numbers stay unique and
+    // the customer/product snapshot read below cannot be wiped by a reset mid-way.
+    public async Task<OrderDto> CreateAsync(CancellationToken ct) =>
+        (await WriteGate.RunAsync(() => CreateOrderAsync(ct), ct)).ToDto();
 
     private async Task<Order> CreateOrderAsync(CancellationToken ct)
     {

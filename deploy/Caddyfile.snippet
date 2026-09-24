@@ -1,0 +1,13 @@
+# Add to the existing Caddyfile, then reload: caddy reload --config <path-to-Caddyfile>
+# Caddy obtains and renews the TLS certificate automatically (ports 80/443 must already be served by Caddy).
+# X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host are set by reverse_proxy by default.
+api.antrias.site {
+	reverse_proxy 127.0.0.1:8080
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+}

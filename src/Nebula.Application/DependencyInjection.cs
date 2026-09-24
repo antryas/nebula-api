@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Nebula.Application.Auth;
+using Nebula.Application.Common;
+using Nebula.Application.Customers;
+using Nebula.Application.Orders;
 
 namespace Nebula.Application;
 
@@ -9,6 +12,10 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<AuthService>();
+        services.AddScoped<OrdersService>();
+        services.AddScoped<CustomersService>();
+        services.AddScoped(sp => new LiveOrderFactory(
+            sp.GetRequiredService<IAppDbContext>(), sp.GetRequiredService<IClock>(), Random.Shared));
         return services;
     }
 }

@@ -30,7 +30,8 @@ public static class DependencyInjection
                 Directory.CreateDirectory(directory);
             }
 
-            options.UseSqlite($"Data Source={path}");
+            // Orders own two collections (items, history): split queries avoid a cartesian join.
+            options.UseSqlite($"Data Source={path}", sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
         });
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.TryAddSingleton<IClock, SystemClock>();

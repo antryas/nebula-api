@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test with coverage
+        run: dotnet test -c Release --no-build --coverage --coverage-output-format cobertura --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          # One Cobertura report per test project; show line coverage per assembly for each.
+          {
+            echo "### Line coverage"
+            for f in TestResults/*.cobertura.xml; do
+              [ -e "$f" ] || continue
+              echo
+              echo "| Assembly | Lines |"
+              echo "| --- | --- |"
+              grep -o '<package [^>]*' "$f" \
+                | sed -E 's/.*line-rate="([0-9.]+)".*name="([^"]+)".*/\2 \1/' \
+                | awk '{ printf "| %s | %.1f%% |\n", $1, $2 * 100 }'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: TestResults/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: nebula-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

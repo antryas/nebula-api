@@ -15,6 +15,7 @@ public static class EndpointRegistration
         var api = app.MapGroup("/api")
             .RequireAuthorization()
             .RequireRateLimiting(RateLimitSetup.ApiPolicy)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         api.MapAuthEndpoints();

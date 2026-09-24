@@ -1,3 +1,4 @@
+using Nebula.Api.OpenApi;
 using Nebula.Application.Common;
 using Nebula.Application.Products;
 
@@ -12,6 +13,25 @@ public static class ProductsEndpoints
         public ProductListQuery ToQuery() =>
             ProductListQuery.Parse(ListQuery.Parse(Page, PageSize, Sort, Dir, Search), Category, Stock);
     }
+
+    private const string ProductExample =
+        """
+        {
+          "sku": "APP-NEB-101",
+          "name": "Nebula Everyday Hoodie",
+          "description": "Soft brushed fleece with a relaxed fit.",
+          "category": "Apparel",
+          "price": 59.99,
+          "compareAtPrice": 79.99,
+          "imageUrl": "",
+          "stock": 0,
+          "variants": [
+            { "id": "", "size": "M", "color": "Black", "stock": 12 },
+            { "id": "", "size": "L", "color": "Black", "stock": 8 }
+          ],
+          "active": true
+        }
+        """;
 
     public static RouteGroupBuilder MapProductsEndpoints(this RouteGroupBuilder api)
     {
@@ -30,6 +50,7 @@ public static class ProductsEndpoints
         group.MapGet("/{id}", (string id, ProductsService products, CancellationToken ct) => products.GetAsync(id, ct))
             .WithName("GetProduct")
             .WithSummary("Get a product")
+            .WithDescription("A single product with its variants.")
             .Produces<ProductDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -44,8 +65,10 @@ public static class ProductsEndpoints
                 "Server assigns `id`, `sold`, `rating`, `createdAt` and a placeholder image when `imageUrl` is blank. "
                 + "With variants, `stock` is their sum. Invalid input or a SKU in use ⇒ 422 `validation` with field details.")
             .Accepts<ProductInput>("application/json")
+            .WithRequestExample(ProductExample)
             .WithValidation<ProductInput>(ProductsService.InvalidMessage)
-            .Produces<ProductDto>(StatusCodes.Status201Created);
+            .Produces<ProductDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapPut("/{id}", (string id, ProductInput? input, ProductsService products, CancellationToken ct) =>
                 products.UpdateAsync(id, input!, ct))
@@ -53,8 +76,10 @@ public static class ProductsEndpoints
             .WithSummary("Update a product")
             .WithDescription("Replaces the editable fields; `id`, `sold`, `rating` and `createdAt` are kept.")
             .Accepts<ProductInput>("application/json")
+            .WithRequestExample(ProductExample)
             .WithValidation<ProductInput>(ProductsService.InvalidMessage)
             .Produces<ProductDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapDelete("/{id}", async (string id, ProductsService products, CancellationToken ct) =>

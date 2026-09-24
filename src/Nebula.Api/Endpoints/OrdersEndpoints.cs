@@ -1,3 +1,4 @@
+using Nebula.Api.OpenApi;
 using Nebula.Application.Common;
 using Nebula.Application.Orders;
 
@@ -30,6 +31,7 @@ public static class OrdersEndpoints
         group.MapGet("/{id}", (string id, OrdersService orders, CancellationToken ct) => orders.GetAsync(id, ct))
             .WithName("GetOrder")
             .WithSummary("Get an order")
+            .WithDescription("A single order with its items, shipping address and status history.")
             .Produces<OrderDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -39,7 +41,9 @@ public static class OrdersEndpoints
             .WithSummary("Change an order's status")
             .WithDescription("Appends a history entry. Delivered and cancelled orders are closed (422 `invalid_transition`).")
             .Accepts<UpdateStatusRequest>("application/json")
+            .WithRequestExample("""{ "status": "shipped" }""")
             .Produces<OrderDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
@@ -49,7 +53,9 @@ public static class OrdersEndpoints
             .WithSummary("Change the status of several orders")
             .WithDescription("Closed and unknown orders are skipped; `updated` counts the others.")
             .Accepts<BulkStatusRequest>("application/json")
+            .WithRequestExample("""{ "ids": ["ord_004800", "ord_004799"], "status": "packing" }""")
             .Produces<BulkStatusResult>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         return api;

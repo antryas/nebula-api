@@ -8,18 +8,11 @@ public static class OpenApiSetup
     {
         services.AddOpenApi(DocumentName, options =>
         {
+            options.CreateSchemaReferenceId = ContractSchemaTransformer.CreateSchemaReferenceId;
+            options.AddDocumentTransformer<NebulaDocumentTransformer>();
             options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
             options.AddOperationTransformer<BearerSecuritySchemeTransformer>();
-            options.AddDocumentTransformer((document, _, _) =>
-            {
-                document.Info.Title = "Nebula Commerce API";
-                document.Info.Version = DocumentName;
-                document.Info.Description =
-                    "Backend for the Nebula Commerce admin dashboard. Sign in with POST /api/auth/login "
-                    + "(any email, password of 6+ characters, e.g. alex@nebula.store / demo1234), "
-                    + "then press Authorize and paste the token. The demo database is re-seeded every 6 hours.";
-                return Task.CompletedTask;
-            });
+            options.AddSchemaTransformer<ContractSchemaTransformer>();
         });
         return services;
     }

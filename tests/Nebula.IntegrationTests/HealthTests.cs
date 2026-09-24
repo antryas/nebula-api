@@ -4,7 +4,8 @@ using Nebula.IntegrationTests.Infrastructure;
 
 namespace Nebula.IntegrationTests;
 
-public sealed class HealthTests(NebulaApiFactory factory) : IClassFixture<NebulaApiFactory>
+[Collection(ApiCollection.Name)]
+public sealed class HealthTests(NebulaApiFactory factory)
 {
     [Fact]
     public async Task Health_returns_healthy()

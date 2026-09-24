@@ -14,6 +14,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => o.CreatedAt);
         builder.HasIndex(o => o.Status);
         builder.HasIndex(o => o.CustomerId);
+        // Case-insensitive ordering, like the mock's collator.
+        builder.Property(o => o.CustomerName).UseCollation(Collations.NoCase);
+        builder.Property(o => o.CustomerEmail).UseCollation(Collations.NoCase);
 
         builder.OwnsOne(o => o.ShippingAddress);
 

@@ -21,6 +21,7 @@ public static class EndpointRegistration
         api.MapDemoEndpoints();
         api.MapAnalyticsEndpoints();
         api.MapOrdersEndpoints();
+        api.MapProductsEndpoints();
         api.MapCustomersEndpoints();
         api.MapLiveEndpoints();
         // Unknown routes are answered by UseNebulaStatusCodePages (404 "Route not found"); a catch-all

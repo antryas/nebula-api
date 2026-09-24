@@ -33,7 +33,7 @@ top bar and turn on **Live .NET backend**) · Demo account: `alex@nebula.store` 
   Swagger UI with an **Authorize** button.
 - **Deterministic demo data:** 60 products, 700 customers and 4,800 orders generated with Bogus
   (seed 42), re-created on start and every 6 hours.
-- **Tested and shipped:** 270 xUnit tests, GitHub Actions (build, test, coverage, Docker build),
+- **Tested and shipped:** 274 xUnit tests, GitHub Actions (build, test, coverage, Docker build),
   a small hardened container image published to GHCR.
 
 ## Architecture
@@ -189,11 +189,11 @@ curl http://127.0.0.1:8080/health
 dotnet test
 ```
 
-270 tests (xUnit v3, built-in `Assert` only, hand-written fakes):
+274 tests (xUnit v3, built-in `Assert` only, hand-written fakes):
 
 - **Unit (136):** validators, list query parsing, order status rules, analytics maths,
   seeder determinism, EF Core mapping.
-- **Integration (134):** every endpoint through `WebApplicationFactory` with a real SQLite file,
+- **Integration (138):** every endpoint through `WebApplicationFactory` with a real SQLite file,
   error and auth shapes, rate limiting, CORS, body limits, the OpenAPI document and JSON contract
   tests that compare responses with the Angular models.
 

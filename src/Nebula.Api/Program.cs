@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using Nebula.Api.Health;
 using Nebula.Application;
 using Nebula.Infrastructure;
 using Nebula.Infrastructure.Persistence;
+using Nebula.Infrastructure.Seeding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,8 +15,9 @@ var app = builder.Build();
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
-    // Replaced by the seeding DatabaseInitializer in Task 2.
-    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreatedAsync();
+    var stopwatch = Stopwatch.StartNew();
+    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().CreateAsync();
+    app.Logger.LogInformation("Database created and seeded in {ElapsedMs} ms", stopwatch.ElapsedMilliseconds);
 }
 
 app.MapHealthChecks("/health", new() { ResponseWriter = HealthResponse.WriteAsync });

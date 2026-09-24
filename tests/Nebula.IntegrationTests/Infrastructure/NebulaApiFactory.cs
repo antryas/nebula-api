@@ -18,6 +18,8 @@ public class NebulaApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Database:Path", _dbPath);
+        // No background re-seeding while tests run.
+        builder.UseSetting("Demo:ResetInterval", "00:00:00");
         foreach (var (key, value) in Settings)
         {
             builder.UseSetting(key, value);

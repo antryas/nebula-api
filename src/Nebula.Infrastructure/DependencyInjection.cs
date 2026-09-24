@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nebula.Application.Common;
 using Nebula.Infrastructure.Persistence;
+using Nebula.Infrastructure.Seeding;
 using Nebula.Infrastructure.Time;
 
 namespace Nebula.Infrastructure;
@@ -33,6 +34,10 @@ public static class DependencyInjection
         });
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.TryAddSingleton<IClock, SystemClock>();
+
+        services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<IDemoResetter, DemoResetter>();
+        services.AddHostedService<PeriodicResetService>();
 
         return services;
     }

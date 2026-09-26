@@ -4,6 +4,7 @@ using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using Nebula.Application.Ai;
 using Nebula.Application.Analytics;
 using Nebula.Application.Auth;
 using Nebula.Application.Orders;
@@ -24,10 +25,17 @@ public sealed class ContractSchemaTransformer : IOpenApiSchemaTransformer
         (typeof(ProductInput), "compareAtPrice"),
     ];
 
+    /// <summary>Request properties clients may leave out.</summary>
+    private static readonly HashSet<(Type Type, string Property)> OptionalRequestProperties =
+    [
+        (typeof(AskRequest), "history"),
+        (typeof(ProductDescriptionRequest), "keywords"),
+    ];
+
     private static readonly HashSet<Type> RequestTypes =
     [
         typeof(LoginRequest), typeof(UpdateStatusRequest), typeof(BulkStatusRequest), typeof(ProductInput),
-        typeof(ProductVariantInput),
+        typeof(ProductVariantInput), typeof(AskRequest), typeof(AiChatTurn), typeof(ProductDescriptionRequest),
     ];
 
     private static readonly string[] OrderStatusValues = ["new", "packing", "shipped", "delivered", "cancelled"];
@@ -42,6 +50,11 @@ public sealed class ContractSchemaTransformer : IOpenApiSchemaTransformer
         [(typeof(UpdateStatusRequest), "status")] = OrderStatusValues,
         [(typeof(BulkStatusRequest), "status")] = OrderStatusValues,
         [(typeof(ProductInput), "category")] = Enum.GetNames<ProductCategory>(),
+        [(typeof(AiChatTurn), "role")] = ["user", "assistant"],
+        [(typeof(AskResponse), "mode")] = [AiModes.Live, AiModes.Recorded],
+        [(typeof(ProductDescriptionRequest), "category")] = Enum.GetNames<ProductCategory>(),
+        [(typeof(ProductDescriptionRequest), "tone")] = ["friendly", "premium", "playful"],
+        [(typeof(ProductDescriptionResponse), "mode")] = [AiModes.Live, AiModes.Recorded],
     };
 
     public Task TransformAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
@@ -144,6 +157,11 @@ public sealed class ContractSchemaTransformer : IOpenApiSchemaTransformer
             if (concrete.Type is { } propertyType && !NullableRequestProperties.Contains((type, name)))
             {
                 concrete.Type = propertyType & ~JsonSchemaType.Null;
+            }
+
+            if (OptionalRequestProperties.Contains((type, name)))
+            {
+                schema.Required?.Remove(name);
             }
         }
 

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nebula.Application.Common;
+using Nebula.Infrastructure.Ai;
 using Nebula.Infrastructure.Persistence;
 using Nebula.Infrastructure.Seeding;
 using Nebula.Infrastructure.Time;
@@ -34,11 +35,14 @@ public static class DependencyInjection
             options.UseSqlite($"Data Source={path}", sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
         });
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<IDryRunner, DryRunner>();
         services.TryAddSingleton<IClock, SystemClock>();
 
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<IDemoResetter, DemoResetter>();
         services.AddHostedService<PeriodicResetService>();
+
+        services.AddAiClient();
 
         return services;
     }

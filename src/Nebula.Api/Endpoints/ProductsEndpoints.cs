@@ -43,7 +43,7 @@ public static class ProductsEndpoints
     public static RouteGroupBuilder MapProductsEndpoints(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
-        var group = api.MapGroup("/products").WithTags("Products");
+        var group = api.MapGroup("/products").WithTags("Products").WithDryRunWhenReadOnly();
 
         group.MapGet("/", ([AsParameters] ProductListParameters p, ProductsService products, CancellationToken ct) =>
                 products.ListAsync(p.ToQuery(), ct))

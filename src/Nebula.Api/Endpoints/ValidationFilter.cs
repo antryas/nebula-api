@@ -6,9 +6,10 @@ namespace Nebula.Api.Endpoints;
 
 /// <summary>
 /// Validates the endpoint argument of type <typeparamref name="T"/> with its registered
-/// <see cref="IValidator{T}"/>; failures become 422 <c>validation</c> with the first message per camelCase field.
+/// <see cref="IValidator{T}"/>; failures become <paramref name="status"/> (422 unless overridden) <c>validation</c> with the
+/// first message per camelCase field.
 /// </summary>
-public sealed class ValidationFilter<T>(string message) : IEndpointFilter
+public sealed class ValidationFilter<T>(string message, int status = StatusCodes.Status422UnprocessableEntity) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
@@ -18,7 +19,7 @@ public sealed class ValidationFilter<T>(string message) : IEndpointFilter
         var argument = context.Arguments.OfType<T>().FirstOrDefault();
         if (argument is null)
         {
-            throw new ValidationFailedException(message);
+            throw new ValidationFailedException(message, status: status);
         }
 
         var validator = context.HttpContext.RequestServices.GetRequiredService<IValidator<T>>();
@@ -31,7 +32,7 @@ public sealed class ValidationFilter<T>(string message) : IEndpointFilter
                 details.TryAdd(ToCamelCasePath(error.PropertyName), error.ErrorMessage);
             }
 
-            throw new ValidationFailedException(message, details);
+            throw new ValidationFailedException(message, details, status);
         }
 
         return await next(context);
@@ -45,8 +46,11 @@ public sealed class ValidationFilter<T>(string message) : IEndpointFilter
 public static class ValidationFilterExtensions
 {
     /// <summary>Validates the <typeparamref name="T"/> argument before the handler runs.</summary>
-    public static RouteHandlerBuilder WithValidation<T>(this RouteHandlerBuilder builder, string message = "Request is invalid") =>
+    public static RouteHandlerBuilder WithValidation<T>(
+        this RouteHandlerBuilder builder,
+        string message = "Request is invalid",
+        int status = StatusCodes.Status422UnprocessableEntity) =>
         builder
-            .AddEndpointFilter(new ValidationFilter<T>(message))
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+            .AddEndpointFilter(new ValidationFilter<T>(message, status))
+            .ProducesProblem(status);
 }

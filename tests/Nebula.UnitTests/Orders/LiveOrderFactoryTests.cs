@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Nebula.Application.Common;
 using Nebula.Application.Orders;
 using Nebula.Domain;
 using Nebula.UnitTests.TestSupport;
@@ -30,7 +31,7 @@ public sealed class LiveOrderFactoryTests : IAsyncLifetime
         OrderDto dto;
         await using (var context = _db.CreateContext())
         {
-            dto = await new LiveOrderFactory(context, new FakeClock(now), new Random(1)).CreateAsync(ct);
+            dto = await new LiveOrderFactory(context, new FakeClock(now), new Random(1), new WriteGate()).CreateAsync(ct);
         }
 
         Assert.Equal(1006, dto.Number);
@@ -75,7 +76,7 @@ public sealed class LiveOrderFactoryTests : IAsyncLifetime
         for (var i = 0; i < 6; i++)
         {
             await using var context = _db.CreateContext();
-            var dto = await new LiveOrderFactory(context, new FakeClock(SqliteTestDb.Now), new Random(i)).CreateAsync(ct);
+            var dto = await new LiveOrderFactory(context, new FakeClock(SqliteTestDb.Now), new Random(i), new WriteGate()).CreateAsync(ct);
 
             Assert.Equal(1006 + i, dto.Number);
             var expected = await context.Orders.AsNoTracking()

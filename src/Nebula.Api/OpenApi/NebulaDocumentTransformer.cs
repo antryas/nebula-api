@@ -16,6 +16,7 @@ public sealed class NebulaDocumentTransformer : IOpenApiDocumentTransformer
         ("Products", "Product catalog CRUD with validation."),
         ("Customers", "Customers with lifetime value and their order history."),
         ("Analytics", "Dashboard aggregates over a rolling range: KPIs, revenue, categories, heatmap, geo, funnel, top products."),
+        ("AI", "Store analyst assistant and product copywriter (LLM with read-only data tools), with daily quotas and a recorded fallback."),
         ("Live", "Simulated incoming orders for the live dashboard feed."),
         ("Demo", "Demo data controls."),
         (HealthTag, "Liveness and database readiness probe (anonymous, not rate limited)."),
@@ -47,8 +48,10 @@ public sealed class NebulaDocumentTransformer : IOpenApiDocumentTransformer
         ```
 
         ### Demo data
-        The SQLite database is generated from a deterministic seed and re-seeded every 6 hours
-        (or on demand with `POST /api/demo/reset`), so feel free to change anything.
+        The SQLite database is generated from a deterministic seed and re-seeded every 6 hours.
+        The public demo is read-only (`GET /api/demo/mode`): writes are validated and return real responses, but
+        are rolled back and carry the header `X-Nebula-Dry-Run: true`, so feel free to try anything.
+        With read-only mode off (`Demo__ReadOnly=false`), changes persist until `POST /api/demo/reset`.
         """;
 
     public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)

@@ -1,8 +1,8 @@
 # Nebula API
 
 An ASP.NET Core 10 Web API for the [Nebula Commerce](https://github.com/antryas/nebula-commerce)
-admin dashboard (Angular): orders, products, customers, analytics and a live order feed, stored in
-SQLite through EF Core. It implements the exact REST contract of the dashboard's in-browser mock,
+admin dashboard (Angular): orders, products, customers, analytics, a live order feed and an AI
+assistant with built-in cost control, stored in SQLite through EF Core. It implements the exact REST contract of the dashboard's in-browser mock,
 so the Angular app can switch from demo data to this real backend at runtime.
 
 [![CI](https://github.com/antryas/nebula-api/actions/workflows/ci.yml/badge.svg)](https://github.com/antryas/nebula-api/actions/workflows/ci.yml)
@@ -17,9 +17,13 @@ top bar and turn on **Live .NET backend**) · Demo account: `alex@nebula.store` 
 
 ## Features
 
-- **21 endpoints** under `/api` plus `/health`: sign-in, orders with a status workflow and bulk updates, product
-  CRUD with validation, customers with lifetime value, seven analytics reports, a live order feed
-  and a demo reset.
+- **25 endpoints** under `/api` plus `/health`: sign-in, orders with a status workflow and bulk updates, product
+  CRUD with validation, customers with lifetime value, seven analytics reports, a live order feed,
+  demo mode and reset, and three AI endpoints.
+- **AI assistant with cost control:** a store analyst that answers questions with read-only data
+  tools, and a product description writer. Provider-agnostic (`IChatClient` from
+  Microsoft.Extensions.AI, DeepSeek today), capped per client and per day, and it keeps working
+  without a key or budget by answering from templates over live data.
 - **Same behavior as the frontend mock:** paging, sorting, search and filters, analytics maths,
   error codes and messages were ported from the Angular mock and are locked by contract tests.
 - **Clean Architecture without ceremony:** four small projects (Domain, Application,
@@ -29,11 +33,14 @@ top bar and turn on **Live .NET backend**) · Demo account: `alex@nebula.store` 
   a readable `message` and field `details` for validation errors.
 - **Security basics:** JWT bearer auth, CORS allow-list, rate limiting per client IP, 64 KB
   request body limit, no `Server` header, exceptions logged but never returned.
+- **Read-only public demo:** writes are validated and return real responses but are rolled back;
+  such responses carry the header `X-Nebula-Dry-Run: true`. Nobody can plant content that other
+  visitors (or the AI assistant) would see.
 - **Documented:** OpenAPI 3.1 document with summaries, examples and the bearer scheme;
   Swagger UI with an **Authorize** button.
 - **Deterministic demo data:** 60 products, 700 customers and 4,800 orders generated with Bogus
   (seed 42), re-created on start and every 6 hours.
-- **Tested and shipped:** 274 xUnit tests, GitHub Actions (build, test, coverage, Docker build),
+- **Tested and shipped:** 379 xUnit tests, GitHub Actions (build, test, coverage, Docker build),
   a small hardened container image published to GHCR.
 
 ## Architecture
@@ -89,7 +96,11 @@ All `/api` endpoints except sign-in need `Authorization: Bearer <token>`.
 | GET | `/api/analytics/funnel` | Conversion funnel |
 | GET | `/api/analytics/top-products` | Best sellers (`limit` 1–50) |
 | POST | `/api/live/tick` | Create a random new order (live feed) |
-| POST | `/api/demo/reset` | Re-seed the demo database (204) |
+| GET | `/api/demo/mode` | `{ readOnly }`: are writes dry runs on this instance |
+| POST | `/api/demo/reset` | Re-seed the demo database (204; no-op when read-only) |
+| GET | `/api/ai/status` | Is live AI on, and how many live requests are left today |
+| POST | `/api/ai/ask` | Ask the store analyst (`question`, optional `history`) |
+| POST | `/api/ai/product-description` | Write a product description (`name`, `category`, `keywords`, `tone`) |
 | GET | `/health` | Health check (no auth, not rate limited) |
 
 Analytics endpoints take `range` = `7d`, `30d` (default), `90d` or `12m`. Lists accept
@@ -128,13 +139,52 @@ Content-Type: application/json
 | Status | `code` | When |
 | --- | --- | --- |
 | 400 | `bad_request` | Body is not valid JSON |
+| 400 | `validation` | Invalid input to `/api/ai/*` (same `details` shape as 422) |
 | 401 | `unauthorized` / `invalid_credentials` | Missing or invalid token / wrong sign-in |
 | 404 | `not_found` | Unknown id or route |
 | 413 | `payload_too_large` | Body over 64 KB |
 | 415 | `unsupported_media_type` | Body is not JSON |
 | 422 | `validation` / `invalid_transition` | Invalid input / order already closed |
-| 429 | `rate_limited` | Over 120 requests per minute (`Retry-After` header) |
+| 429 | `rate_limited` | Over 120 requests per minute, or 10 per minute on `/api/ai` (`Retry-After` header) |
 | 500 | `server_error` | Unexpected error (details only in the log) |
+
+## AI assistant
+
+Two features for the dashboard, built so that a public demo cannot run up a bill:
+
+- **Ask the analyst** (`POST /api/ai/ask`): questions like "What were my top 5 products this month?"
+  are answered by an LLM that calls read-only tools wrapping the existing services (sales overview,
+  top products, sales by category, orders by status, top customers, product search). The system
+  prompt limits it to store data, forbids invented numbers and asks for short answers in the
+  language of the question. `toolsUsed` shows which data the answer is based on.
+- **Product descriptions** (`POST /api/ai/product-description`): 2–4 sentences of copy from a name,
+  category, keywords and a tone (`friendly`, `premium`, `playful`).
+
+**Provider-agnostic.** Application code depends only on `IChatClient` from
+[Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai). DeepSeek is
+used through its OpenAI-compatible API (`Ai__Endpoint`, `Ai__Model`); switching to OpenAI, Azure
+OpenAI or Claude means changing one registration in Infrastructure. Tool calls run through the
+library's function-invocation middleware with a cap on round trips (`Ai__MaxToolIterations`).
+
+**Cost control, in layers:**
+
+1. **Prepaid provider balance.** DeepSeek bills a prepaid balance; with auto top-up off, the worst
+   case is the balance.
+2. **Daily caps.** Live requests per client IP (`Ai__DailyRequestsPerClient`, default 20) and for all
+   clients together (`Ai__DailyRequestsTotal`, default 500), reset at midnight UTC.
+   `GET /api/ai/status` shows what is left.
+3. **Small requests.** Output capped by `Ai__MaxOutputTokens` (600, hard cap 2000), reasoning mode
+   off, compact tool results (at most 10 rows, only the needed fields), questions up to 500
+   characters, at most 6 history turns. Token usage of every call is logged.
+4. **Rate limit.** `/api/ai` has its own window of 10 requests per minute per IP.
+5. **Recorded fallback.** Without a key, with the quota used up, or when the provider fails or takes
+   longer than 20 s, answers come from templates filled with real numbers from the same services
+   (`mode: "recorded"`), so the demo keeps working and costs nothing. The four suggested questions
+   are answered this way; anything else gets a short "live AI is not available" message.
+
+User input is treated as untrusted: the tools are read-only, input sizes are capped, and provider
+errors are logged but never returned. The API key comes only from the environment (`Ai__ApiKey`)
+and is never logged.
 
 ## Auth
 
@@ -157,9 +207,15 @@ curl -s -X POST http://localhost:5080/api/auth/login \
   status mix and daily/weekly/hourly shapes, with Bogus and a fixed seed (42).
 - The "now" of the seed is the start time rounded down to the hour, so charts always show recent
   dates. With the same "now" the data is identical, which the tests rely on.
-- The SQLite file is deleted and created again on every start. Visitors can change anything:
-  `POST /api/demo/reset` and a background service (every 6 hours, `Demo__ResetInterval`) bring the
-  data back to the seed in one transaction.
+- The SQLite file is deleted and created again on every start. A background service (every 6 hours,
+  `Demo__ResetInterval`) brings the data back to the seed in one transaction.
+- **Read-only mode** (`Demo__ReadOnly`, default `true`): product create/update/delete and order status
+  changes (single and bulk) run inside a transaction that is rolled back after the response is built.
+  Visitors get the same status codes, bodies (including the new id) and validation errors as a real
+  write, plus the header `X-Nebula-Dry-Run: true` (exposed via CORS), but the shared database never
+  changes. `POST /api/demo/reset` is a no-op and `GET /api/demo/mode` tells the dashboard which mode
+  is on. The live order feed and the periodic reset are server-generated and keep writing. With
+  `Demo__ReadOnly=false` (tests, local runs) changes persist until a reset.
 
 ## Quick start
 
@@ -178,7 +234,7 @@ locally (`npm start`) and switch it to the live backend.
 With Docker:
 
 ```bash
-cp .env.example .env        # then set Jwt__SigningKey to a random value (32+ bytes)
+cp .env.example .env        # then set Jwt__SigningKey (32+ random bytes); Ai__ApiKey is optional
 docker compose up -d --build
 curl http://127.0.0.1:8080/health
 ```
@@ -189,12 +245,12 @@ curl http://127.0.0.1:8080/health
 dotnet test
 ```
 
-274 tests (xUnit v3, built-in `Assert` only, hand-written fakes):
+379 tests (xUnit v3, built-in `Assert` only, hand-written fakes):
 
-- **Unit (136):** validators, list query parsing, order status rules, analytics maths,
-  seeder determinism, EF Core mapping.
-- **Integration (138):** every endpoint through `WebApplicationFactory` with a real SQLite file,
-  error and auth shapes, rate limiting, CORS, body limits, the OpenAPI document and JSON contract
+- **Unit (189):** validators, list query parsing, order status rules, analytics maths,
+  seeder determinism, EF Core mapping, AI quotas, recorded answers and the DeepSeek wire request.
+- **Integration (190):** every endpoint through `WebApplicationFactory` with a real SQLite file,
+  error and auth shapes, rate limiting, CORS, body limits, the read-only demo mode, the OpenAPI document and JSON contract
   tests that compare responses with the Angular models.
 
 CI runs build, tests with coverage and a Docker build on every push and pull request.
@@ -204,10 +260,10 @@ CI runs build, tests with coverage and a Docker build on every push and pull req
 ```
 src/
   Nebula.Domain/          entities and enums, no dependencies
-  Nebula.Application/     feature services (Orders, Products, Customers, Analytics, Auth),
+  Nebula.Application/     feature services (Orders, Products, Customers, Analytics, Auth, Ai),
                           DTOs, FluentValidation, paging and sorting helpers
   Nebula.Infrastructure/  AppDbContext and entity configurations (SQLite),
-                          deterministic seeder, demo reset services
+                          deterministic seeder, demo reset services, AI provider client
   Nebula.Api/             Program.cs, endpoint groups, ProblemDetails errors, JWT,
                           CORS, rate limiting, OpenAPI + Swagger UI, health check
 tests/

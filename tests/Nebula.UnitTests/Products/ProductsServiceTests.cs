@@ -59,7 +59,7 @@ public sealed class ProductsServiceTests : IAsyncLifetime
 
     public ValueTask DisposeAsync() => _db.DisposeAsync();
 
-    private static ProductsService Service(AppDbContext context) => new(context, new FakeClock(SqliteTestDb.Now));
+    private static ProductsService Service(AppDbContext context) => new(context, new FakeClock(SqliteTestDb.Now), new WriteGate());
 
     private static ProductListQuery Query(
         string? category = null, string? stock = null, string? search = null, string? sort = null, string? dir = null) =>

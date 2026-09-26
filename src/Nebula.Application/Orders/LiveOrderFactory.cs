@@ -10,7 +10,7 @@ namespace Nebula.Application.Orders;
 /// 1-3 random active products right now; the order is stored as <c>new</c> and aggregates stay consistent.
 /// Random draws happen in the same sequence as the mock.
 /// </summary>
-public sealed class LiveOrderFactory(IAppDbContext db, IClock clock, Random random)
+public sealed class LiveOrderFactory(IAppDbContext db, IClock clock, Random random, WriteGate writeGate)
 {
     private const int NumberOffset = 1000;
 
@@ -20,7 +20,7 @@ public sealed class LiveOrderFactory(IAppDbContext db, IClock clock, Random rand
     // Serialized with other allocating writes and demo resets: order numbers stay unique and
     // the customer/product snapshot read below cannot be wiped by a reset mid-way.
     public async Task<OrderDto> CreateAsync(CancellationToken ct) =>
-        (await WriteGate.RunAsync(() => CreateOrderAsync(ct), ct)).ToDto();
+        (await writeGate.RunAsync(() => CreateOrderAsync(ct), ct)).ToDto();
 
     private async Task<Order> CreateOrderAsync(CancellationToken ct)
     {

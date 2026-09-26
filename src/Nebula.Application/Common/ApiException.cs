@@ -12,5 +12,6 @@ public class ApiException(int status, string code, string message, IReadOnlyDict
 public sealed class NotFoundException(string resource)
     : ApiException(404, "not_found", $"{resource} not found");
 
-public sealed class ValidationFailedException(string message, IReadOnlyDictionary<string, string>? details = null)
-    : ApiException(422, "validation", message, details);
+/// <summary>Invalid input: 422 <c>validation</c> by default; the AI endpoints use 400 per their contract.</summary>
+public sealed class ValidationFailedException(string message, IReadOnlyDictionary<string, string>? details = null, int status = 422)
+    : ApiException(status, "validation", message, details);

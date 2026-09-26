@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Nebula.Api.Endpoints;
 
 namespace Nebula.Api.Security;
 
@@ -17,6 +18,8 @@ public static class CorsSetup
                 .WithOrigins(origins)
                 .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
                 .WithHeaders("Authorization", "Content-Type")
+                // Lets the dashboard tell a dry-run write from a real one.
+                .WithExposedHeaders(ReadOnlyDemo.DryRunHeader)
                 .SetPreflightMaxAge(TimeSpan.FromMinutes(10)));
         });
         return services;

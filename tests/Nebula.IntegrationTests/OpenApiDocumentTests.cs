@@ -31,10 +31,14 @@ public sealed class OpenApiDocumentTests(NebulaApiFactory factory)
         "GET /api/analytics/top-products",
         "POST /api/live/tick",
         "POST /api/demo/reset",
+        "GET /api/demo/mode",
+        "GET /api/ai/status",
+        "POST /api/ai/ask",
+        "POST /api/ai/product-description",
         "GET /health",
     ];
 
-    private static readonly string[] TagOrder = ["Auth", "Orders", "Products", "Customers", "Analytics", "Live", "Demo", "Health"];
+    private static readonly string[] TagOrder = ["Auth", "Orders", "Products", "Customers", "Analytics", "AI", "Live", "Demo", "Health"];
 
     private async Task<JsonElement> GetDocumentAsync()
     {
@@ -50,7 +54,7 @@ public sealed class OpenApiDocumentTests(NebulaApiFactory factory)
         select ($"{operation.Name.ToUpperInvariant()} {path.Name}", operation.Value);
 
     [Fact]
-    public async Task Document_lists_all_22_operations_with_summary_and_description()
+    public async Task Document_lists_all_26_operations_with_summary_and_description()
     {
         var document = await GetDocumentAsync();
 
@@ -136,6 +140,24 @@ public sealed class OpenApiDocumentTests(NebulaApiFactory factory)
     }
 
     [Fact]
+    public async Task Ai_schemas_describe_the_contract()
+    {
+        var schemas = (await GetDocumentAsync()).GetProperty("components").GetProperty("schemas");
+
+        static string?[] Required(JsonElement schema) => [.. schema.GetProperty("required").EnumerateArray().Select(r => r.GetString())];
+        static string?[] Enum(JsonElement schema, string property) =>
+            [.. schema.GetProperty("properties").GetProperty(property).GetProperty("enum").EnumerateArray().Select(v => v.GetString())];
+
+        Assert.Equal(["question"], Required(schemas.GetProperty("AskRequest")));
+        Assert.Equal(["name", "category", "tone"], Required(schemas.GetProperty("ProductDescriptionRequest")));
+        Assert.Equal(["friendly", "premium", "playful"], Enum(schemas.GetProperty("ProductDescriptionRequest"), "tone"));
+        Assert.Equal(["user", "assistant"], Enum(schemas.GetProperty("AiChatTurn"), "role"));
+        Assert.Equal(["live", "recorded"], Enum(schemas.GetProperty("AskResponse"), "mode"));
+        Assert.Equal(["live", "recorded"], Enum(schemas.GetProperty("ProductDescriptionResponse"), "mode"));
+        Assert.True(schemas.TryGetProperty("AiStatus", out _));
+    }
+
+    [Fact]
     public async Task Problem_schema_documents_the_contract_fields()
     {
         var problem = (await GetDocumentAsync()).GetProperty("components").GetProperty("schemas").GetProperty("ProblemDetails");
@@ -150,11 +172,44 @@ public sealed class OpenApiDocumentTests(NebulaApiFactory factory)
     [Theory]
     [InlineData("/api/auth/login", "post", "email")]
     [InlineData("/api/products", "post", "sku")]
+    [InlineData("/api/ai/ask", "post", "question")]
+    [InlineData("/api/ai/product-description", "post", "tone")]
     public async Task Request_bodies_have_examples(string path, string method, string field)
     {
         var operation = (await GetDocumentAsync()).GetProperty("paths").GetProperty(path).GetProperty(method);
 
         var example = operation.GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("example");
         Assert.True(example.TryGetProperty(field, out _));
+    }
+
+    /// <summary>Every visitor write is dry-run in the read-only demo; only sign-in, AI and the live feed are exempt.</summary>
+    [Fact]
+    public async Task Mutating_operations_document_the_dry_run_header()
+    {
+        string[] exempt = ["POST /api/auth/login", "POST /api/ai/ask", "POST /api/ai/product-description", "POST /api/live/tick"];
+
+        var mutating = EnumerateOperations(await GetDocumentAsync())
+            .Where(o => !o.Key.StartsWith("GET ", StringComparison.Ordinal) && !exempt.Contains(o.Key))
+            .ToList();
+
+        Assert.Equal(6, mutating.Count);
+        Assert.All(mutating, o =>
+        {
+            var success = o.Operation.GetProperty("responses").EnumerateObject().First(r => r.Name.StartsWith('2')).Value;
+            Assert.True(
+                success.TryGetProperty("headers", out var headers) && headers.TryGetProperty("X-Nebula-Dry-Run", out _),
+                $"{o.Key} does not document the dry-run header");
+            Assert.Contains("X-Nebula-Dry-Run", o.Operation.GetProperty("description").GetString(), StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task Demo_mode_has_a_response_example()
+    {
+        var operation = (await GetDocumentAsync()).GetProperty("paths").GetProperty("/api/demo/mode").GetProperty("get");
+
+        var example = operation.GetProperty("responses").GetProperty("200").GetProperty("content")
+            .GetProperty("application/json").GetProperty("example");
+        Assert.True(example.GetProperty("readOnly").GetBoolean());
     }
 }

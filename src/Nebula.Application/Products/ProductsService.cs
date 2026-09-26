@@ -10,7 +10,7 @@ namespace Nebula.Application.Products;
 /// Port of <c>mock-api/handlers/products.ts</c>. Input is expected to have passed <see cref="ProductInputValidator"/>;
 /// the service adds the SKU uniqueness check and derives the server-owned fields.
 /// </summary>
-public sealed class ProductsService(IAppDbContext db, IClock clock)
+public sealed class ProductsService(IAppDbContext db, IClock clock, WriteGate writeGate)
 {
     public const string DefaultSort = "createdAt";
     public const string InvalidMessage = "Product is invalid";
@@ -78,7 +78,7 @@ public sealed class ProductsService(IAppDbContext db, IClock clock)
         ArgumentNullException.ThrowIfNull(input);
 
         // Serialized so two concurrent requests cannot pick the same next id.
-        return await WriteGate.RunAsync(async () =>
+        return await writeGate.RunAsync(async () =>
         {
             await EnsureSkuIsFreeAsync(input.Sku, selfId: null, ct);
 

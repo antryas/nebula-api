@@ -25,7 +25,7 @@ public static class OrdersEndpoints
     public static RouteGroupBuilder MapOrdersEndpoints(this RouteGroupBuilder api)
     {
         ArgumentNullException.ThrowIfNull(api);
-        var group = api.MapGroup("/orders").WithTags("Orders");
+        var group = api.MapGroup("/orders").WithTags("Orders").WithDryRunWhenReadOnly();
 
         group.MapGet("/", ([AsParameters] OrderListParameters p, OrdersService orders, CancellationToken ct) =>
                 orders.ListAsync(p.ToQuery(), ct))

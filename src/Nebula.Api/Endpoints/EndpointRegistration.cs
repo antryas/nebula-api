@@ -25,6 +25,7 @@ public static class EndpointRegistration
         api.MapProductsEndpoints();
         api.MapCustomersEndpoints();
         api.MapLiveEndpoints();
+        api.MapAiEndpoints();
         // Unknown routes are answered by UseNebulaStatusCodePages (404 "Route not found"); a catch-all
         // fallback endpoint here would shadow routing's own 405 and 415 responses.
     }

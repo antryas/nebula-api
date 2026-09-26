@@ -4,11 +4,12 @@ using Nebula.Application.Common;
 
 namespace Nebula.Infrastructure.Seeding;
 
-internal sealed partial class DemoResetter(DatabaseInitializer initializer, ILogger<DemoResetter> logger) : IDemoResetter
+internal sealed partial class DemoResetter(DatabaseInitializer initializer, WriteGate writeGate, ILogger<DemoResetter> logger)
+    : IDemoResetter
 {
-    // Shares the process-wide WriteGate so a reset never interleaves with live orders or product creates.
+    // Shares the app's WriteGate so a reset never interleaves with any other write.
     public Task ResetAsync(CancellationToken ct = default) =>
-        WriteGate.RunAsync(async () =>
+        writeGate.RunAsync(async () =>
         {
             var stopwatch = Stopwatch.StartNew();
             await initializer.ResetAsync(ct);
